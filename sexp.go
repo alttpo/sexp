@@ -63,7 +63,14 @@ var (
 )
 
 func Parse(s io.RuneScanner) (n *Node, err error) {
-	n, _, err = parseNode(s)
+	var listEnd bool
+	n, listEnd, err = parseNode(s)
+	if listEnd {
+		err = ErrUnexpectedChar
+	}
+	if err != nil {
+		n = nil
+	}
 	return
 }
 
@@ -174,6 +181,11 @@ func parseList(s io.RuneScanner) (n *Node, err error) {
 		}
 		if discard {
 			continue
+		}
+
+		err = s.UnreadRune()
+		if err != nil {
+			return
 		}
 
 		var child *Node

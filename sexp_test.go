@@ -3,6 +3,7 @@ package sexp
 import (
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -16,7 +17,46 @@ func TestParse(t *testing.T) {
 		wantN   *Node
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "empty list",
+			args: args{
+				s: strings.NewReader("()"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List:        make([]*Node, 0, 0),
+			},
+			wantErr: false,
+		},
+		{
+			name: "mismatched end of list",
+			args: args{
+				s: strings.NewReader(")"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "mismatched start of list",
+			args: args{
+				s: strings.NewReader("("),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "single token",
+			args: args{
+				s: strings.NewReader("abc"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
