@@ -68,6 +68,10 @@ func Parse(s io.RuneScanner) (n *Node, err error) {
 	if listEnd {
 		err = ErrUnexpectedChar
 	}
+	if err == io.EOF {
+		// allow regular EOF errors but still fail on ErrUnexpectedEOF
+		err = nil
+	}
 	if err != nil {
 		n = nil
 	}
@@ -161,6 +165,13 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 }
 
 func parseList(s io.RuneScanner) (n *Node, err error) {
+	defer func() {
+		// convert regular EOF errors to ErrUnexpectedEOF
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
 	n = &Node{
 		Kind:        KindList,
 		OctetString: nil,
@@ -268,28 +279,42 @@ func parseToken(s io.RuneScanner) (n *Node, err error) {
 	var sb bytes.Buffer
 
 	var r rune
-	for {
+	eof := false
+	for !eof {
 		r, _, err = s.ReadRune()
+		if err == io.EOF {
+			eof = true
+			err = nil
+			break
+		}
 		if err != nil {
 			return
 		}
 
 		if !isTokenRemainder(r) {
-			err = s.UnreadRune()
-			if err != nil {
-				return
-			}
+			break
 
-			n = &Node{
-				Kind:        KindToken,
-				OctetString: sb.Bytes(),
-				List:        nil,
-			}
-			return
 		}
 
 		sb.WriteRune(r)
 	}
+
+	if !eof {
+		err = s.UnreadRune()
+		if err != nil {
+			return
+		}
+	}
+
+	n = &Node{
+		Kind:        KindToken,
+		OctetString: sb.Bytes(),
+		List:        nil,
+	}
+	if eof {
+		err = io.EOF
+	}
+	return
 }
 
 func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
