@@ -65,6 +65,63 @@ var (
 	ErrInvalidLengthPrefix         = errors.New("invalid length prefix")
 )
 
+func (n *Node) String() string {
+	var sb strings.Builder
+
+	err := n.appendToBuilder(&sb)
+	if err != nil {
+		return "!!(" + err.Error() + ")!!"
+	}
+
+	return sb.String()
+}
+
+func (n *Node) appendToBuilder(sb *strings.Builder) (err error) {
+	if n == nil {
+		return
+	}
+
+	switch n.Kind {
+	case KindList:
+		sb.WriteRune('(')
+		for i, c := range n.List {
+			c.appendToBuilder(sb)
+			if i < len(n.List)-1 {
+				sb.WriteRune(' ')
+			}
+		}
+		sb.WriteRune(')')
+		return
+	case KindToken:
+		sb.Write(n.OctetString)
+		return
+	case KindHexadecimal:
+		sb.WriteRune('#')
+		_, err = hex.NewEncoder(sb).Write(n.OctetString)
+		if err != nil {
+			return
+		}
+		sb.WriteRune('#')
+		return
+	case KindBase64:
+		sb.WriteRune('|')
+		var enc io.WriteCloser
+		enc = base64.NewEncoder(base64.StdEncoding, sb)
+		_, err = enc.Write(n.OctetString)
+		if err != nil {
+			return
+		}
+		err = enc.Close()
+		if err != nil {
+			return
+		}
+		sb.WriteRune('|')
+		return
+	}
+
+	return
+}
+
 func Parse(s io.RuneScanner) (n *Node, err error) {
 	var listEnd bool
 	n, listEnd, err = parseNode(s)
@@ -402,7 +459,7 @@ func parseHexadecimal(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Nod
 	}
 
 	n = &Node{
-		Kind:        KindToken,
+		Kind:        KindHexadecimal,
 		OctetString: dst[:dn],
 		List:        nil,
 	}
@@ -490,7 +547,7 @@ func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, er
 	}
 
 	n = &Node{
-		Kind:        KindToken,
+		Kind:        KindBase64,
 		OctetString: dst[:dn],
 		List:        nil,
 	}

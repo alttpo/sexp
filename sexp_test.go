@@ -142,7 +142,7 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("#616263#"),
 			},
 			wantN: &Node{
-				Kind:        KindToken,
+				Kind:        KindHexadecimal,
 				OctetString: []byte("abc"),
 				List:        nil,
 			},
@@ -154,7 +154,7 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("#61 6 26 3 #"),
 			},
 			wantN: &Node{
-				Kind:        KindToken,
+				Kind:        KindHexadecimal,
 				OctetString: []byte("abc"),
 				List:        nil,
 			},
@@ -190,7 +190,7 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("3#616263#"),
 			},
 			wantN: &Node{
-				Kind:        KindToken,
+				Kind:        KindHexadecimal,
 				OctetString: []byte("abc"),
 				List:        nil,
 			},
@@ -210,7 +210,7 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("|YWJ j|"),
 			},
 			wantN: &Node{
-				Kind:        KindToken,
+				Kind:        KindBase64,
 				OctetString: []byte("abc"),
 				List:        nil,
 			},
@@ -246,7 +246,7 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("3|YWJj|"),
 			},
 			wantN: &Node{
-				Kind:        KindToken,
+				Kind:        KindBase64,
 				OctetString: []byte("abc"),
 				List:        nil,
 			},
@@ -353,6 +353,157 @@ func TestParse(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotN, tt.wantN) {
 				t.Errorf("Parse() gotN = %v, want %v", gotN, tt.wantN)
+			}
+		})
+	}
+}
+
+func TestNode_String(t *testing.T) {
+	type fields struct {
+		Kind        Kind
+		OctetString []byte
+		List        []*Node
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{
+			name: "()",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List:        []*Node{},
+			},
+			want: "()",
+		},
+		{
+			name: "(abc)",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+				},
+			},
+			want: "(abc)",
+		},
+		{
+			name: "(abc def)",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+					{
+						Kind:        KindToken,
+						OctetString: []byte("def"),
+						List:        nil,
+					},
+				},
+			},
+			want: "(abc def)",
+		},
+		{
+			name: "(abc def (g z/a *))",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+					{
+						Kind:        KindToken,
+						OctetString: []byte("def"),
+						List:        nil,
+					},
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List: []*Node{
+							{
+								Kind:        KindToken,
+								OctetString: []byte("g"),
+								List:        nil,
+							},
+							{
+								Kind:        KindToken,
+								OctetString: []byte("z/a"),
+								List:        nil,
+							},
+							{
+								Kind:        KindToken,
+								OctetString: []byte("*"),
+								List:        nil,
+							},
+						},
+					},
+				},
+			},
+			want: "(abc def (g z/a *))",
+		},
+		{
+			name: "(abc #616263#)",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+					{
+						Kind:        KindHexadecimal,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+				},
+			},
+			want: "(abc #616263#)",
+		},
+		{
+			name: "(abc |YWJj|)",
+			fields: fields{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+					{
+						Kind:        KindBase64,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+				},
+			},
+			want: "(abc |YWJj|)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &Node{
+				Kind:        tt.fields.Kind,
+				OctetString: tt.fields.OctetString,
+				List:        tt.fields.List,
+			}
+			if got := n.String(); got != tt.want {
+				t.Errorf("String() = %v, want %v", got, tt.want)
 			}
 		})
 	}
