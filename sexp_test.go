@@ -142,6 +142,130 @@ func TestParse(t *testing.T) {
 				s: strings.NewReader("#616263#"),
 			},
 			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: hexadecimal with whitespace",
+			args: args{
+				s: strings.NewReader("#61 6 26 3 #"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xfail: hexadecimal with newline",
+			args: args{
+				s: strings.NewReader("#61\n62 63 #"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xfail: hexadecimal without termination",
+			args: args{
+				s: strings.NewReader("#61|YyWj"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xfail: hexadecimal but eof",
+			args: args{
+				s: strings.NewReader("#61"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xpass: hexadecimal with length prefix",
+			args: args{
+				s: strings.NewReader("3#616263#"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xfail: hexadecimal with wrong length prefix",
+			args: args{
+				s: strings.NewReader("4#616263#"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xpass: base64 with whitespace",
+			args: args{
+				s: strings.NewReader("|YWJ j|"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xfail: base64 with newline",
+			args: args{
+				s: strings.NewReader("#61\n62 63 #"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xfail: base64 without termination",
+			args: args{
+				s: strings.NewReader("|YWj#61"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xfail: base64 but eof",
+			args: args{
+				s: strings.NewReader("|YWj"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xpass: base64 with length prefix",
+			args: args{
+				s: strings.NewReader("3|YWJj|"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xfail: base64 with wrong length prefix",
+			args: args{
+				s: strings.NewReader("4|YWJj|"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xpass: list of two tokens with embedded lists",
+			args: args{
+				s: strings.NewReader("(abc (def ghi z/a))"),
+			},
+			wantN: &Node{
 				Kind:        KindList,
 				OctetString: nil,
 				List: []*Node{
@@ -149,6 +273,71 @@ func TestParse(t *testing.T) {
 						Kind:        KindToken,
 						OctetString: []byte("abc"),
 						List:        nil,
+					},
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List: []*Node{
+							{
+								Kind:        KindToken,
+								OctetString: []byte("def"),
+								List:        nil,
+							},
+							{
+								Kind:        KindToken,
+								OctetString: []byte("ghi"),
+								List:        nil,
+							},
+							{
+								Kind:        KindToken,
+								OctetString: []byte("z/a"),
+								List:        nil,
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: list of empty lists",
+			args: args{
+				s: strings.NewReader("(() () () ( () () ))"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List:        []*Node{},
+					},
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List:        []*Node{},
+					},
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List:        []*Node{},
+					},
+					{
+						Kind:        KindList,
+						OctetString: nil,
+						List: []*Node{
+							{
+								Kind:        KindList,
+								OctetString: nil,
+								List:        []*Node{},
+							},
+							{
+								Kind:        KindList,
+								OctetString: nil,
+								List:        []*Node{},
+							},
+						},
 					},
 				},
 			},

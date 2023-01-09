@@ -2,6 +2,8 @@ package sexp
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"io"
 	"strconv"
@@ -60,6 +62,7 @@ var (
 	ErrNotASCII                    = errors.New("only ASCII encoding supported")
 	ErrParseUnacceptableWhitespace = errors.New("unacceptable whitespace char")
 	ErrUnexpectedChar              = errors.New("unexpected character")
+	ErrInvalidLengthPrefix         = errors.New("invalid length prefix")
 )
 
 func Parse(s io.RuneScanner) (n *Node, err error) {
@@ -138,6 +141,11 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 		var decimal uint64
 		hasDecimal := false
 		if r >= '0' && r <= '9' {
+			err = s.UnreadRune()
+			if err != nil {
+				return
+			}
+
 			decimal, err = parseDecimal(s)
 			if err != nil {
 				return
@@ -293,7 +301,6 @@ func parseToken(s io.RuneScanner) (n *Node, err error) {
 
 		if !isTokenRemainder(r) {
 			break
-
 		}
 
 		sb.WriteRune(r)
@@ -317,10 +324,175 @@ func parseToken(s io.RuneScanner) (n *Node, err error) {
 	return
 }
 
-func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
-	return nil, errors.New("unimplemented")
+func isHexadecimalRemainder(r rune) bool {
+	if r >= '0' && r <= '9' {
+		return true
+	}
+	if r >= 'A' && r <= 'F' {
+		return true
+	}
+	if r >= 'a' && r <= 'f' {
+		return true
+	}
+	return false
 }
 
 func parseHexadecimal(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
-	return nil, errors.New("unimplemented")
+	var sb bytes.Buffer
+
+	var r rune
+	eof := false
+	for !eof {
+		r, _, err = s.ReadRune()
+		if err == io.EOF {
+			eof = true
+			err = nil
+			break
+		}
+		if err != nil {
+			return
+		}
+
+		var discard bool
+		discard, err = shouldDiscard(r)
+		if err != nil {
+			return
+		}
+		if discard {
+			continue
+		}
+
+		if r == '#' {
+			break
+		}
+
+		if !isHexadecimalRemainder(r) {
+			err = ErrUnexpectedChar
+			return
+		}
+
+		sb.WriteRune(r)
+	}
+
+	if !eof {
+		err = s.UnreadRune()
+		if err != nil {
+			return
+		}
+	} else {
+		err = io.ErrUnexpectedEOF
+		return
+	}
+
+	var dst []byte
+	if hasDecimal {
+		dst = make([]byte, decimal)
+	} else {
+		dst = make([]byte, hex.DecodedLen(sb.Len()))
+	}
+
+	var dn int
+	dn, err = hex.Decode(dst, sb.Bytes())
+	if err != nil {
+		return
+	}
+	if hasDecimal && dn != len(dst) {
+		err = ErrInvalidLengthPrefix
+		return
+	}
+
+	n = &Node{
+		Kind:        KindToken,
+		OctetString: dst[:dn],
+		List:        nil,
+	}
+	return
+}
+
+func isBase64Remainder(r rune) bool {
+	if r >= '0' && r <= '9' {
+		return true
+	}
+	if r >= 'A' && r <= 'Z' {
+		return true
+	}
+	if r >= 'a' && r <= 'z' {
+		return true
+	}
+	if r == '+' || r == '/' {
+		return true
+	}
+	return false
+}
+
+func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
+	var sb bytes.Buffer
+
+	var r rune
+	eof := false
+	for !eof {
+		r, _, err = s.ReadRune()
+		if err == io.EOF {
+			eof = true
+			err = nil
+			break
+		}
+		if err != nil {
+			return
+		}
+
+		var discard bool
+		discard, err = shouldDiscard(r)
+		if err != nil {
+			return
+		}
+		if discard {
+			continue
+		}
+
+		if r == '|' {
+			break
+		}
+
+		if !isBase64Remainder(r) {
+			err = ErrUnexpectedChar
+			return
+		}
+
+		sb.WriteRune(r)
+	}
+
+	if !eof {
+		err = s.UnreadRune()
+		if err != nil {
+			return
+		}
+	} else {
+		err = io.ErrUnexpectedEOF
+		return
+	}
+
+	var dst []byte
+	if hasDecimal {
+		dst = make([]byte, decimal)
+	} else {
+		dst = make([]byte, base64.StdEncoding.DecodedLen(sb.Len()))
+	}
+
+	var dn int
+	dn, err = base64.StdEncoding.Decode(dst, sb.Bytes())
+	if err != nil {
+		return
+	}
+	if hasDecimal && dn != len(dst) {
+		err = ErrInvalidLengthPrefix
+		return
+	}
+
+	n = &Node{
+		Kind:        KindToken,
+		OctetString: dst[:dn],
+		List:        nil,
+	}
+	return
 }
