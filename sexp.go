@@ -63,6 +63,7 @@ var (
 	ErrParseUnacceptableWhitespace = errors.New("unacceptable whitespace char")
 	ErrUnexpectedChar              = errors.New("unexpected character")
 	ErrInvalidLengthPrefix         = errors.New("invalid length prefix")
+	ErrInvalidTokenChar            = errors.New("invalid token character")
 )
 
 func (n *Node) String() string {
@@ -120,6 +121,55 @@ func (n *Node) appendToBuilder(sb *strings.Builder) (err error) {
 	}
 
 	return
+}
+
+func Token(s string) (n *Node, err error) {
+	for i, r := range s {
+		if i == 0 && !isTokenStart(r) {
+			return nil, ErrInvalidTokenChar
+		} else if i > 0 && !isTokenRemainder(r) {
+			return nil, ErrInvalidTokenChar
+		}
+	}
+
+	return &Node{
+		Kind:        KindToken,
+		OctetString: []byte(s),
+		List:        nil,
+	}, nil
+}
+
+func MustToken(s string) (n *Node) {
+	var err error
+	n, err = Token(s)
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+func Hexadecimal(s []byte) (n *Node) {
+	return &Node{
+		Kind:        KindHexadecimal,
+		OctetString: s,
+		List:        nil,
+	}
+}
+
+func Base64(s []byte) (n *Node) {
+	return &Node{
+		Kind:        KindBase64,
+		OctetString: s,
+		List:        nil,
+	}
+}
+
+func List(children ...*Node) (n *Node) {
+	return &Node{
+		Kind:        KindList,
+		OctetString: nil,
+		List:        children,
+	}
 }
 
 func Parse(s io.RuneScanner) (n *Node, err error) {
