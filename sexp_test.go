@@ -18,7 +18,7 @@ func TestParse(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "empty list",
+			name: "xpass: empty list",
 			args: args{
 				s: strings.NewReader("()"),
 			},
@@ -30,7 +30,7 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "mismatched end of list",
+			name: "xfail: mismatched end of list",
 			args: args{
 				s: strings.NewReader(")"),
 			},
@@ -38,7 +38,7 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "mismatched start of list",
+			name: "xfail: mismatched start of list",
 			args: args{
 				s: strings.NewReader("("),
 			},
@@ -46,7 +46,43 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "single token",
+			name: "xpass: list of one token",
+			args: args{
+				s: strings.NewReader("(abcdef)"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abcdef"),
+						List:        nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: list of one token with whitespace",
+			args: args{
+				s: strings.NewReader("( a-1*b+c:d=e/f_g.h\t\v\f )"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("a-1*b+c:d=e/f_g.h"),
+						List:        nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: single token",
 			args: args{
 				s: strings.NewReader("abc"),
 			},
@@ -54,6 +90,67 @@ func TestParse(t *testing.T) {
 				Kind:        KindToken,
 				OctetString: []byte("abc"),
 				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: single token with trailing newline",
+			args: args{
+				s: strings.NewReader("abc\n"),
+			},
+			wantN: &Node{
+				Kind:        KindToken,
+				OctetString: []byte("abc"),
+				List:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "xfail: list containing newline",
+			args: args{
+				s: strings.NewReader("(abc\n)"),
+			},
+			wantN:   nil,
+			wantErr: true,
+		},
+		{
+			name: "xpass: list of two tokens with tab whitespace",
+			args: args{
+				s: strings.NewReader("(abc\tdef)"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+					{
+						Kind:        KindToken,
+						OctetString: []byte("def"),
+						List:        nil,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: hexadecimal",
+			args: args{
+				s: strings.NewReader("#616263#"),
+			},
+			wantN: &Node{
+				Kind:        KindList,
+				OctetString: nil,
+				List: []*Node{
+					{
+						Kind:        KindToken,
+						OctetString: []byte("abc"),
+						List:        nil,
+					},
+				},
 			},
 			wantErr: false,
 		},
