@@ -45,6 +45,14 @@ import (
 
 type Kind int
 
+var (
+	ErrNotASCII                    = errors.New("only ASCII encoding supported")
+	ErrParseUnacceptableWhitespace = errors.New("unacceptable whitespace char")
+	ErrUnexpectedChar              = errors.New("unexpected character")
+	ErrInvalidLengthPrefix         = errors.New("invalid length prefix")
+	ErrInvalidTokenChar            = errors.New("invalid token character")
+)
+
 const (
 	KindList Kind = iota
 	KindToken
@@ -58,72 +66,31 @@ type Node struct {
 	List        []*Node
 }
 
-var (
-	ErrNotASCII                    = errors.New("only ASCII encoding supported")
-	ErrParseUnacceptableWhitespace = errors.New("unacceptable whitespace char")
-	ErrUnexpectedChar              = errors.New("unexpected character")
-	ErrInvalidLengthPrefix         = errors.New("invalid length prefix")
-	ErrInvalidTokenChar            = errors.New("invalid token character")
-)
-
-func (n *Node) String() string {
-	var sb strings.Builder
-
-	err := n.appendToBuilder(&sb)
-	if err != nil {
-		return "!!(" + err.Error() + ")!!"
-	}
-
-	return sb.String()
+type Encoding interface {
+	Token(s string) (n *Node, err error)
+	MustToken(s string) (n *Node)
+	Hexadecimal(s []byte) (n *Node)
+	Base64(s []byte) (n *Node)
+	List(children ...*Node) (n *Node)
+	Parse(s io.RuneScanner) (n *Node, err error)
 }
 
-func (n *Node) appendToBuilder(sb *strings.Builder) (err error) {
-	if n == nil {
-		return
-	}
-
-	switch n.Kind {
-	case KindList:
-		sb.WriteRune('(')
-		for i, c := range n.List {
-			c.appendToBuilder(sb)
-			if i < len(n.List)-1 {
-				sb.WriteRune(' ')
-			}
-		}
-		sb.WriteRune(')')
-		return
-	case KindToken:
-		sb.Write(n.OctetString)
-		return
-	case KindHexadecimal:
-		sb.WriteRune('#')
-		_, err = hex.NewEncoder(sb).Write(n.OctetString)
-		if err != nil {
-			return
-		}
-		sb.WriteRune('#')
-		return
-	case KindBase64:
-		sb.WriteRune('|')
-		var enc io.WriteCloser
-		enc = base64.NewEncoder(base64.StdEncoding, sb)
-		_, err = enc.Write(n.OctetString)
-		if err != nil {
-			return
-		}
-		err = enc.Close()
-		if err != nil {
-			return
-		}
-		sb.WriteRune('|')
-		return
-	}
-
-	return
+type encoding struct {
+	DisallowNewlines bool
 }
+
+// LimitedEncoding disallows any newline whitespace characters to appear in serialized form
+var LimitedEncoding Encoding = &encoding{DisallowNewlines: true}
+
+// FullEncoding allows newline characters to appear in serialized form
+var FullEncoding Encoding = &encoding{DisallowNewlines: false}
+
+var _ = FullEncoding
 
 func Token(s string) (n *Node, err error) {
+	return LimitedEncoding.Token(s)
+}
+func (e *encoding) Token(s string) (n *Node, err error) {
 	for i, r := range s {
 		if i == 0 && !isTokenStart(r) {
 			return nil, ErrInvalidTokenChar
@@ -140,6 +107,9 @@ func Token(s string) (n *Node, err error) {
 }
 
 func MustToken(s string) (n *Node) {
+	return LimitedEncoding.MustToken(s)
+}
+func (e *encoding) MustToken(s string) (n *Node) {
 	var err error
 	n, err = Token(s)
 	if err != nil {
@@ -149,6 +119,9 @@ func MustToken(s string) (n *Node) {
 }
 
 func Hexadecimal(s []byte) (n *Node) {
+	return LimitedEncoding.Hexadecimal(s)
+}
+func (e *encoding) Hexadecimal(s []byte) (n *Node) {
 	return &Node{
 		Kind:        KindHexadecimal,
 		OctetString: s,
@@ -157,6 +130,9 @@ func Hexadecimal(s []byte) (n *Node) {
 }
 
 func Base64(s []byte) (n *Node) {
+	return LimitedEncoding.Base64(s)
+}
+func (e *encoding) Base64(s []byte) (n *Node) {
 	return &Node{
 		Kind:        KindBase64,
 		OctetString: s,
@@ -165,6 +141,9 @@ func Base64(s []byte) (n *Node) {
 }
 
 func List(children ...*Node) (n *Node) {
+	return LimitedEncoding.List(children...)
+}
+func (e *encoding) List(children ...*Node) (n *Node) {
 	return &Node{
 		Kind:        KindList,
 		OctetString: nil,
@@ -173,8 +152,11 @@ func List(children ...*Node) (n *Node) {
 }
 
 func Parse(s io.RuneScanner) (n *Node, err error) {
+	return LimitedEncoding.Parse(s)
+}
+func (e *encoding) Parse(s io.RuneScanner) (n *Node, err error) {
 	var listEnd bool
-	n, listEnd, err = parseNode(s)
+	n, listEnd, err = e.parseNode(s)
 	if listEnd {
 		err = ErrUnexpectedChar
 	}
@@ -188,14 +170,18 @@ func Parse(s io.RuneScanner) (n *Node, err error) {
 	return
 }
 
-func shouldDiscard(r rune) (discard bool, err error) {
+func (e *encoding) shouldDiscard(r rune) (discard bool, err error) {
 	// error on unacceptable chars:
 	if r > unicode.MaxASCII {
 		discard, err = false, ErrNotASCII
 		return
 	}
 	if r == '\r' || r == '\n' {
-		discard, err = false, ErrParseUnacceptableWhitespace
+		if e.DisallowNewlines {
+			discard, err = false, ErrParseUnacceptableWhitespace
+		} else {
+			discard = true
+		}
 		return
 	}
 
@@ -208,7 +194,7 @@ func shouldDiscard(r rune) (discard bool, err error) {
 	return
 }
 
-func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
+func (e *encoding) parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 	var r rune
 	for {
 		r, _, err = s.ReadRune()
@@ -218,7 +204,7 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 
 		// skip whitespace or error on bad char:
 		var discard bool
-		discard, err = shouldDiscard(r)
+		discard, err = e.shouldDiscard(r)
 		if err != nil {
 			return
 		}
@@ -230,7 +216,7 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 			return nil, true, nil
 		}
 		if r == '(' {
-			n, err = parseList(s)
+			n, err = e.parseList(s)
 			return
 		}
 
@@ -240,7 +226,7 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 			if err != nil {
 				return
 			}
-			n, err = parseToken(s)
+			n, err = e.parseToken(s)
 			return
 		}
 
@@ -253,7 +239,7 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 				return
 			}
 
-			decimal, err = parseDecimal(s)
+			decimal, err = e.parseDecimal(s)
 			if err != nil {
 				return
 			}
@@ -266,11 +252,11 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 		}
 
 		if r == '|' {
-			n, err = parseBase64(s, decimal, hasDecimal)
+			n, err = e.parseBase64(s, decimal, hasDecimal)
 			return
 		}
 		if r == '#' {
-			n, err = parseHexadecimal(s, decimal, hasDecimal)
+			n, err = e.parseHexadecimal(s, decimal, hasDecimal)
 			return
 		}
 
@@ -279,7 +265,7 @@ func parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 	}
 }
 
-func parseList(s io.RuneScanner) (n *Node, err error) {
+func (e *encoding) parseList(s io.RuneScanner) (n *Node, err error) {
 	defer func() {
 		// convert regular EOF errors to ErrUnexpectedEOF
 		if err == io.EOF {
@@ -301,7 +287,7 @@ func parseList(s io.RuneScanner) (n *Node, err error) {
 		}
 
 		var discard bool
-		discard, err = shouldDiscard(r)
+		discard, err = e.shouldDiscard(r)
 		if err != nil {
 			return
 		}
@@ -316,7 +302,7 @@ func parseList(s io.RuneScanner) (n *Node, err error) {
 
 		var child *Node
 		var listEnd bool
-		child, listEnd, err = parseNode(s)
+		child, listEnd, err = e.parseNode(s)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +352,7 @@ func isTokenRemainder(r rune) bool {
 	return isAlpha(r) || isDigit(r) || isGraphic(r)
 }
 
-func parseDecimal(s io.RuneScanner) (v uint64, err error) {
+func (e *encoding) parseDecimal(s io.RuneScanner) (v uint64, err error) {
 	var sb strings.Builder
 
 	var r rune
@@ -390,7 +376,7 @@ func parseDecimal(s io.RuneScanner) (v uint64, err error) {
 	}
 }
 
-func parseToken(s io.RuneScanner) (n *Node, err error) {
+func (e *encoding) parseToken(s io.RuneScanner) (n *Node, err error) {
 	var sb bytes.Buffer
 
 	var r rune
@@ -444,7 +430,7 @@ func isHexadecimalRemainder(r rune) bool {
 	return false
 }
 
-func parseHexadecimal(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
+func (e *encoding) parseHexadecimal(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
 	var sb bytes.Buffer
 
 	var r rune
@@ -461,7 +447,7 @@ func parseHexadecimal(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Nod
 		}
 
 		var discard bool
-		discard, err = shouldDiscard(r)
+		discard, err = e.shouldDiscard(r)
 		if err != nil {
 			return
 		}
@@ -532,7 +518,7 @@ func isBase64Remainder(r rune) bool {
 	return false
 }
 
-func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
+func (e *encoding) parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, err error) {
 	var sb bytes.Buffer
 
 	var r rune
@@ -549,7 +535,7 @@ func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, er
 		}
 
 		var discard bool
-		discard, err = shouldDiscard(r)
+		discard, err = e.shouldDiscard(r)
 		if err != nil {
 			return
 		}
@@ -601,5 +587,65 @@ func parseBase64(s io.RuneScanner, decimal uint64, hasDecimal bool) (n *Node, er
 		OctetString: dst[:dn],
 		List:        nil,
 	}
+	return
+}
+
+func (n *Node) String() string {
+	var sb strings.Builder
+
+	err := n.appendToBuilder(&sb)
+	if err != nil {
+		return "!!(" + err.Error() + ")!!"
+	}
+
+	return sb.String()
+}
+
+func (n *Node) appendToBuilder(sb *strings.Builder) (err error) {
+	if n == nil {
+		return
+	}
+
+	switch n.Kind {
+	case KindList:
+		sb.WriteRune('(')
+		for i, c := range n.List {
+			err = c.appendToBuilder(sb)
+			if err != nil {
+				return
+			}
+			if i < len(n.List)-1 {
+				sb.WriteRune(' ')
+			}
+		}
+		sb.WriteRune(')')
+		return
+	case KindToken:
+		sb.Write(n.OctetString)
+		return
+	case KindHexadecimal:
+		sb.WriteRune('#')
+		_, err = hex.NewEncoder(sb).Write(n.OctetString)
+		if err != nil {
+			return
+		}
+		sb.WriteRune('#')
+		return
+	case KindBase64:
+		sb.WriteRune('|')
+		var enc io.WriteCloser
+		enc = base64.NewEncoder(base64.StdEncoding, sb)
+		_, err = enc.Write(n.OctetString)
+		if err != nil {
+			return
+		}
+		err = enc.Close()
+		if err != nil {
+			return
+		}
+		sb.WriteRune('|')
+		return
+	}
+
 	return
 }
