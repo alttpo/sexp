@@ -423,3 +423,79 @@ func TestNode_String(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMulti(t *testing.T) {
+	type args struct {
+		s io.RuneScanner
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantN   []*Node
+		wantErr bool
+	}{
+		{
+			name: "xpass: consecutive lists",
+			args: args{
+				s: strings.NewReader("(a b)(c d)"),
+			},
+			wantN: []*Node{
+				List(
+					MustToken("a"),
+					MustToken("b"),
+				),
+				List(
+					MustToken("c"),
+					MustToken("d"),
+				),
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: consecutive list and token",
+			args: args{
+				s: strings.NewReader("(a b)c"),
+			},
+			wantN: []*Node{
+				List(
+					MustToken("a"),
+					MustToken("b"),
+				),
+				MustToken("c"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "xpass: consecutive list and token",
+			args: args{
+				s: strings.NewReader("(a b)c d|YWJj|"),
+			},
+			wantN: []*Node{
+				List(
+					MustToken("a"),
+					MustToken("b"),
+				),
+				MustToken("c"),
+				MustToken("d"),
+				Base64([]byte("abc")),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotN := make([]*Node, len(tt.wantN))
+			for i := range tt.wantN {
+				var err error
+				gotN[i], err = Parse(tt.args.s)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			}
+			if !reflect.DeepEqual(gotN, tt.wantN) {
+				t.Errorf("Parse() gotN = %v, want %v", gotN, tt.wantN)
+			}
+		})
+	}
+}

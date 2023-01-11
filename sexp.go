@@ -111,7 +111,7 @@ func MustToken(s string) (n *Node) {
 }
 func (e *encoding) MustToken(s string) (n *Node) {
 	var err error
-	n, err = Token(s)
+	n, err = e.Token(s)
 	if err != nil {
 		panic(err)
 	}
