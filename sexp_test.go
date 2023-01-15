@@ -22,11 +22,7 @@ func TestParse(t *testing.T) {
 			args: args{
 				s: strings.NewReader("()"),
 			},
-			wantN: &Node{
-				Kind:        KindList,
-				OctetString: nil,
-				List:        make([]*Node, 0, 0),
-			},
+			wantN:   MustList(),
 			wantErr: false,
 		},
 		{
@@ -50,17 +46,7 @@ func TestParse(t *testing.T) {
 			args: args{
 				s: strings.NewReader("(abcdef)"),
 			},
-			wantN: &Node{
-				Kind:        KindList,
-				OctetString: nil,
-				List: []*Node{
-					{
-						Kind:        KindToken,
-						OctetString: []byte("abcdef"),
-						List:        nil,
-					},
-				},
-			},
+			wantN:   MustList(MustToken("abcdef")),
 			wantErr: false,
 		},
 		{
@@ -68,17 +54,7 @@ func TestParse(t *testing.T) {
 			args: args{
 				s: strings.NewReader("( a-1*b+c:d=e/f_g.h\t\v\f )"),
 			},
-			wantN: &Node{
-				Kind:        KindList,
-				OctetString: nil,
-				List: []*Node{
-					{
-						Kind:        KindToken,
-						OctetString: []byte("a-1*b+c:d=e/f_g.h"),
-						List:        nil,
-					},
-				},
-			},
+			wantN:   MustList(MustToken("a-1*b+c:d=e/f_g.h")),
 			wantErr: false,
 		},
 		{
@@ -366,19 +342,19 @@ func TestNode_String(t *testing.T) {
 	}{
 		{
 			name:   "()",
-			fields: List(),
+			fields: MustList(),
 			want:   "()",
 		},
 		{
 			name: "(abc)",
-			fields: List(
+			fields: MustList(
 				MustToken("abc"),
 			),
 			want: "(abc)",
 		},
 		{
 			name: "(abc def)",
-			fields: List(
+			fields: MustList(
 				MustToken("abc"),
 				MustToken("def"),
 			),
@@ -386,10 +362,10 @@ func TestNode_String(t *testing.T) {
 		},
 		{
 			name: "(abc def (g z/a *))",
-			fields: List(
+			fields: MustList(
 				MustToken("abc"),
 				MustToken("def"),
-				List(
+				MustList(
 					MustToken("g"),
 					MustToken("z/a"),
 					MustToken("*"),
@@ -399,17 +375,17 @@ func TestNode_String(t *testing.T) {
 		},
 		{
 			name: "(abc #616263#)",
-			fields: List(
+			fields: MustList(
 				MustToken("abc"),
-				Hexadecimal([]byte("abc")),
+				MustHexadecimal([]byte("abc")),
 			),
 			want: "(abc #616263#)",
 		},
 		{
 			name: "(abc |YWJj|)",
-			fields: List(
+			fields: MustList(
 				MustToken("abc"),
-				Base64([]byte("abc")),
+				MustBase64([]byte("abc")),
 			),
 			want: "(abc |YWJj|)",
 		},
@@ -440,11 +416,11 @@ func TestParseMulti(t *testing.T) {
 				s: strings.NewReader("(a b)(c d)"),
 			},
 			wantN: []*Node{
-				List(
+				MustList(
 					MustToken("a"),
 					MustToken("b"),
 				),
-				List(
+				MustList(
 					MustToken("c"),
 					MustToken("d"),
 				),
@@ -457,7 +433,7 @@ func TestParseMulti(t *testing.T) {
 				s: strings.NewReader("(a b)c"),
 			},
 			wantN: []*Node{
-				List(
+				MustList(
 					MustToken("a"),
 					MustToken("b"),
 				),
@@ -471,13 +447,13 @@ func TestParseMulti(t *testing.T) {
 				s: strings.NewReader("(a b)c d|YWJj|"),
 			},
 			wantN: []*Node{
-				List(
+				MustList(
 					MustToken("a"),
 					MustToken("b"),
 				),
 				MustToken("c"),
 				MustToken("d"),
-				Base64([]byte("abc")),
+				MustBase64([]byte("abc")),
 			},
 			wantErr: false,
 		},
