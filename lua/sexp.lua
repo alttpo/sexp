@@ -15,6 +15,7 @@ do
     local _ch_plus = string.byte('+')
     local _ch_minus = string.byte('-')
     local _ch_equals = string.byte('=')
+    local _ch_hash = string.byte('#')
     local _ch_space = string.byte(' ')
     local _ch_tab = string.byte('\t')
     local _ch_vtab = string.byte('\v')
@@ -142,6 +143,80 @@ do
         return n, i, serr('eof')
     end
 
+    local hexmap = {}
+    do
+        hexmap[string.byte('0')] = 0x0
+        hexmap[string.byte('1')] = 0x1
+        hexmap[string.byte('2')] = 0x2
+        hexmap[string.byte('3')] = 0x3
+        hexmap[string.byte('4')] = 0x4
+        hexmap[string.byte('5')] = 0x5
+        hexmap[string.byte('6')] = 0x6
+        hexmap[string.byte('7')] = 0x7
+        hexmap[string.byte('8')] = 0x8
+        hexmap[string.byte('9')] = 0x9
+        hexmap[string.byte('a')] = 0xa
+        hexmap[string.byte('b')] = 0xb
+        hexmap[string.byte('c')] = 0xc
+        hexmap[string.byte('d')] = 0xd
+        hexmap[string.byte('e')] = 0xe
+        hexmap[string.byte('f')] = 0xf
+        hexmap[string.byte('A')] = 0xA
+        hexmap[string.byte('B')] = 0xB
+        hexmap[string.byte('C')] = 0xC
+        hexmap[string.byte('D')] = 0xD
+        hexmap[string.byte('E')] = 0xE
+        hexmap[string.byte('F')] = 0xF
+    end
+    local function parse_hex(s, i)
+        local function serr(str)
+            return { err = str; i = i }
+        end
+
+        local n = { hex = "" }
+        local c = {}
+        local d, e = 1, 0
+        local function node()
+            n.hex = string.char(unpack(c))
+            return n
+        end
+
+        while i <= #s do
+            local r = s:byte(i)
+            -- validate character range:
+            if r > 128 then
+                return node(), i, serr('not ascii')
+            elseif r == _ch_cr or r == _ch_lf then
+                return node(), i, serr('newlines not allowed')
+            end
+
+            -- safe to advance:
+            i = i + 1
+
+            h = hexmap[r]
+            if is_space(r) then
+                -- skip whitespace
+            elseif r == _ch_hash then
+                -- end of hex:
+                return node(), i, null
+            elseif h ~= null then
+                -- add hex char:
+                e = e + 1
+                if e == 2 then
+                    c[d] = c[d] + h
+                    d = d + 1
+                    e = 0
+                else
+                    c[d] = h * 16
+                end
+            else
+                return node(), i, serr('unexpected character')
+            end
+        end
+
+        return node(), i, serr('eof')
+    end
+
     -- s: string:  s-expression to parse
     -- i: integer: starting index
     -- returns:
@@ -176,6 +251,9 @@ do
             elseif r == _ch_paren_open then
                 -- start of list
                 n, i, err = parse_list(s, i)
+                return n, i, false, err
+            elseif r == _ch_hash then
+                n, i, err = parse_hex(s, i)
                 return n, i, false, err
             elseif is_token_start(r) then
                 n, i, err = parse_token(s, i - 1)

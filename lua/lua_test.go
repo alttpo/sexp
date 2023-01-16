@@ -19,6 +19,13 @@ func expectToken(s string) *lua.LTable {
 	t.RawSetString("token", lua.LString(s))
 	return t
 }
+
+func expectHex(v []byte) *lua.LTable {
+	t := table()
+	t.RawSetString("hex", lua.LString(v))
+	return t
+}
+
 func expectList(children ...*lua.LTable) *lua.LTable {
 	t := table()
 	list := table()
@@ -83,6 +90,18 @@ func TestLuaParser(t *testing.T) {
 			nstr:    ")",
 			wantErr: "unexpected end of list",
 			wantN:   lua.LNil,
+		},
+		{
+			name:    "(#aa#)",
+			nstr:    "(#aa#)",
+			wantErr: "",
+			wantN:   expectList(expectHex([]byte{0xaa})),
+		},
+		{
+			name:    "(#aa bbc c#)",
+			nstr:    "(#aa bbc c#)",
+			wantErr: "",
+			wantN:   expectList(expectHex([]byte{0xaa, 0xbb, 0xcc})),
 		},
 	}
 
