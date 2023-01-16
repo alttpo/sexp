@@ -66,7 +66,7 @@ do
     end
 
     local function parse_token(s, i)
-        local function err(str)
+        local function serr(str)
             return { err = str; i = i }
         end
 
@@ -83,9 +83,9 @@ do
             local r = s:byte(i)
             -- validate character range:
             if r > 128 then
-                return node(), i, err('not ascii')
+                return node(), i, serr('not ascii')
             elseif r == _ch_cr or r == _ch_lf then
-                return node(), i, err('newlines not allowed')
+                return node(), i, serr('newlines not allowed')
             end
 
             if is_token_remainder(r) then
@@ -100,7 +100,7 @@ do
         end
 
         -- all we can say here is we reached the end of the string:
-        return node(), i, err('eof')
+        return node(), i, serr('eof')
     end
 
     local parse_node
@@ -154,9 +154,7 @@ do
             return { err = str; i = i }
         end
 
-        local n = {
-            list = {}
-        }
+        local n, err
 
         while i <= #s do
             local r = s:byte(i)
@@ -177,9 +175,11 @@ do
                 return null, i, true, null
             elseif r == _ch_paren_open then
                 -- start of list
-                return parse_list(s, i)
+                n, i, err = parse_list(s, i)
+                return n, i, false, err
             elseif is_token_start(r) then
-                return parse_token(s, i - 1)
+                n, i, err = parse_token(s, i - 1)
+                return n, i, false, err
             else
                 return null, i, false, serr('unexpected character')
             end
@@ -191,6 +191,9 @@ do
     -- global entry point for parsing
     function sexp_parse(s)
         local n, i, eol, err = parse_node(s, 1)
-        return n, i, eol, err
+        if eol then
+            return n, i, { err = 'unexpected end of list', i = i }
+        end
+        return n, i, err
     end
 end
