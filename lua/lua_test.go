@@ -1,6 +1,7 @@
 package lua
 
 import (
+	"crypto/rand"
 	"fmt"
 	"github.com/alttpo/sexp"
 	"github.com/yuin/gopher-lua"
@@ -47,13 +48,13 @@ func TestLuaParser(t *testing.T) {
 	var cases = []test{
 		{
 			name:    "(a)",
-			n:       sexp.List(sexp.MustToken("a")),
+			n:       sexp.MustList(sexp.MustToken("a")),
 			wantErr: "",
 			wantN:   expectList(expectToken("a")),
 		},
 		{
 			name: "(a b c)",
-			n: sexp.List(
+			n: sexp.MustList(
 				sexp.MustToken("a"),
 				sexp.MustToken("b"),
 				sexp.MustToken("c"),
@@ -67,7 +68,7 @@ func TestLuaParser(t *testing.T) {
 		},
 		{
 			name: "(a+1 b-2 c/3)",
-			n: sexp.List(
+			n: sexp.MustList(
 				sexp.MustToken("a+1"),
 				sexp.MustToken("b-2"),
 				sexp.MustToken("c/3"),
@@ -103,20 +104,30 @@ func TestLuaParser(t *testing.T) {
 			wantErr: "",
 			wantN:   expectList(expectHex([]byte{0xaa, 0xbb, 0xcc})),
 		},
+		func() test {
+			large := make([]byte, 256)
+			rand.Read(large)
+
+			return test{
+				name:  "large hex",
+				n:     sexp.MustHexadecimal(large),
+				wantN: expectHex(large),
+			}
+		}(),
+	}
+
+	l := lua.NewState(lua.Options{})
+	defer l.Close()
+
+	// load the tests.lua file:
+	var err error
+	err = l.DoFile("sexp.lua")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			l := lua.NewState(lua.Options{})
-			defer l.Close()
-
-			// load the tests.lua file:
-			var err error
-			err = l.DoFile("sexp.lua")
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			nstr := tt.nstr
 			if tt.n != nil {
 				nstr = tt.n.String()

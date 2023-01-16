@@ -1,27 +1,28 @@
 do
-    local _ch_digit_0 = string.byte('0')
-    local _ch_digit_9 = string.byte('9')
-    local _ch_upper_A = string.byte('A')
-    local _ch_upper_Z = string.byte('Z')
-    local _ch_lower_A = string.byte('a')
-    local _ch_lower_Z = string.byte('z')
-    local _ch_cr = string.byte('\r')
-    local _ch_lf = string.byte('\n')
-    local _ch_dot = string.byte('.')
-    local _ch_slash = string.byte('/')
-    local _ch_under = string.byte('_')
-    local _ch_colon = string.byte(':')
-    local _ch_asterisk = string.byte('*')
-    local _ch_plus = string.byte('+')
-    local _ch_minus = string.byte('-')
-    local _ch_equals = string.byte('=')
-    local _ch_hash = string.byte('#')
-    local _ch_space = string.byte(' ')
-    local _ch_tab = string.byte('\t')
-    local _ch_vtab = string.byte('\v')
-    local _ch_ff = string.byte('\f')
-    local _ch_paren_close = string.byte(')')
-    local _ch_paren_open = string.byte('(')
+    local _b = string.byte
+    local _ch_digit_0 = _b('0')
+    local _ch_digit_9 = _b('9')
+    local _ch_upper_A = _b('A')
+    local _ch_upper_Z = _b('Z')
+    local _ch_lower_A = _b('a')
+    local _ch_lower_Z = _b('z')
+    local _ch_cr = _b('\r')
+    local _ch_lf = _b('\n')
+    local _ch_dot = _b('.')
+    local _ch_slash = _b('/')
+    local _ch_under = _b('_')
+    local _ch_colon = _b(':')
+    local _ch_asterisk = _b('*')
+    local _ch_plus = _b('+')
+    local _ch_minus = _b('-')
+    local _ch_equals = _b('=')
+    local _ch_hash = _b('#')
+    local _ch_space = _b(' ')
+    local _ch_tab = _b('\t')
+    local _ch_vtab = _b('\v')
+    local _ch_ff = _b('\f')
+    local _ch_paren_close = _b(')')
+    local _ch_paren_open = _b('(')
 
     local function is_space(r)
         if r <= _ch_space or r == _ch_tab or r == _ch_vtab or r == _ch_ff then
@@ -145,28 +146,28 @@ do
 
     local hexmap = {}
     do
-        hexmap[string.byte('0')] = 0x0
-        hexmap[string.byte('1')] = 0x1
-        hexmap[string.byte('2')] = 0x2
-        hexmap[string.byte('3')] = 0x3
-        hexmap[string.byte('4')] = 0x4
-        hexmap[string.byte('5')] = 0x5
-        hexmap[string.byte('6')] = 0x6
-        hexmap[string.byte('7')] = 0x7
-        hexmap[string.byte('8')] = 0x8
-        hexmap[string.byte('9')] = 0x9
-        hexmap[string.byte('a')] = 0xa
-        hexmap[string.byte('b')] = 0xb
-        hexmap[string.byte('c')] = 0xc
-        hexmap[string.byte('d')] = 0xd
-        hexmap[string.byte('e')] = 0xe
-        hexmap[string.byte('f')] = 0xf
-        hexmap[string.byte('A')] = 0xA
-        hexmap[string.byte('B')] = 0xB
-        hexmap[string.byte('C')] = 0xC
-        hexmap[string.byte('D')] = 0xD
-        hexmap[string.byte('E')] = 0xE
-        hexmap[string.byte('F')] = 0xF
+        hexmap[_b('0')] = 0x0
+        hexmap[_b('1')] = 0x1
+        hexmap[_b('2')] = 0x2
+        hexmap[_b('3')] = 0x3
+        hexmap[_b('4')] = 0x4
+        hexmap[_b('5')] = 0x5
+        hexmap[_b('6')] = 0x6
+        hexmap[_b('7')] = 0x7
+        hexmap[_b('8')] = 0x8
+        hexmap[_b('9')] = 0x9
+        hexmap[_b('a')] = 0xa
+        hexmap[_b('b')] = 0xb
+        hexmap[_b('c')] = 0xc
+        hexmap[_b('d')] = 0xd
+        hexmap[_b('e')] = 0xe
+        hexmap[_b('f')] = 0xf
+        hexmap[_b('A')] = 0xA
+        hexmap[_b('B')] = 0xB
+        hexmap[_b('C')] = 0xC
+        hexmap[_b('D')] = 0xD
+        hexmap[_b('E')] = 0xE
+        hexmap[_b('F')] = 0xF
     end
     local function parse_hex(s, i)
         local function serr(str)
