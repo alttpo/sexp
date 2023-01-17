@@ -3,7 +3,6 @@ package sexp
 type Producer interface {
 	Token(s string) (n *Node, err error)
 	Hexadecimal(s []byte) (n *Node, err error)
-	Base64(s []byte) (n *Node, err error)
 	List(children ...*Node) (n *Node, err error)
 }
 
@@ -51,22 +50,6 @@ func MustHexadecimal(s []byte) (n *Node) {
 func (e producer) Hexadecimal(s []byte) (n *Node, err error) {
 	return &Node{
 		Kind:        KindHexadecimal,
-		OctetString: s,
-		List:        nil,
-	}, nil
-}
-
-func MustBase64(s []byte) (n *Node) {
-	var err error
-	n, err = LimitedProducer.Base64(s)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-func (e producer) Base64(s []byte) (n *Node, err error) {
-	return &Node{
-		Kind:        KindBase64,
 		OctetString: s,
 		List:        nil,
 	}, nil

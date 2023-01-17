@@ -2,7 +2,6 @@ package sexp
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"io"
 	"strconv"
@@ -15,7 +14,6 @@ type Parser interface {
 	ParseList(s io.RuneScanner) (n *Node, err error)
 	ParseToken(s io.RuneScanner) (n *Node, err error)
 	ParseHexadecimal(s io.RuneScanner, h LengthHint) (n *Node, err error)
-	ParseBase64(s io.RuneScanner, h LengthHint) (n *Node, err error)
 }
 
 type LengthHint struct {
@@ -131,10 +129,6 @@ func (e parser) parseNode(s io.RuneScanner) (n *Node, listEnd bool, err error) {
 			}
 		}
 
-		if r == '|' {
-			n, err = e.ParseBase64(s, h)
-			return
-		}
 		if r == '#' {
 			n, err = e.ParseHexadecimal(s, h)
 			return
@@ -376,94 +370,6 @@ func (e parser) ParseHexadecimal(s io.RuneScanner, h LengthHint) (n *Node, err e
 
 	n = &Node{
 		Kind:        KindHexadecimal,
-		OctetString: dst[:dn],
-		List:        nil,
-	}
-	return
-}
-
-func isBase64Remainder(r rune) bool {
-	if r >= '0' && r <= '9' {
-		return true
-	}
-	if r >= 'A' && r <= 'Z' {
-		return true
-	}
-	if r >= 'a' && r <= 'z' {
-		return true
-	}
-	if r == '+' || r == '/' {
-		return true
-	}
-	return false
-}
-
-func (e parser) ParseBase64(s io.RuneScanner, h LengthHint) (n *Node, err error) {
-	var sb bytes.Buffer
-
-	var r rune
-	eof := false
-	for !eof {
-		r, _, err = s.ReadRune()
-		if err == io.EOF {
-			eof = true
-			err = nil
-			break
-		}
-		if err != nil {
-			return
-		}
-
-		var discard bool
-		discard, err = e.shouldDiscard(r)
-		if err != nil {
-			return
-		}
-		if discard {
-			continue
-		}
-
-		if r == '|' {
-			break
-		}
-
-		if !isBase64Remainder(r) {
-			err = ErrUnexpectedChar
-			return
-		}
-
-		sb.WriteRune(r)
-	}
-
-	if !eof {
-		err = s.UnreadRune()
-		if err != nil {
-			return
-		}
-	} else {
-		err = io.ErrUnexpectedEOF
-		return
-	}
-
-	var dst []byte
-	if h.Has {
-		dst = make([]byte, h.Length)
-	} else {
-		dst = make([]byte, base64.StdEncoding.DecodedLen(sb.Len()))
-	}
-
-	var dn int
-	dn, err = base64.StdEncoding.Decode(dst, sb.Bytes())
-	if err != nil {
-		return
-	}
-	if h.Has && dn != len(dst) {
-		err = ErrInvalidLengthPrefix
-		return
-	}
-
-	n = &Node{
-		Kind:        KindBase64,
 		OctetString: dst[:dn],
 		List:        nil,
 	}

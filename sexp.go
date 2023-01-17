@@ -1,10 +1,8 @@
 package sexp
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"io"
 	"strings"
 )
 
@@ -54,7 +52,6 @@ const (
 	KindList Kind = iota
 	KindToken
 	KindHexadecimal
-	KindBase64
 )
 
 type Node struct {
@@ -103,20 +100,6 @@ func (n *Node) appendToBuilder(sb *strings.Builder) (err error) {
 			return
 		}
 		sb.WriteRune('#')
-		return
-	case KindBase64:
-		sb.WriteRune('|')
-		var enc io.WriteCloser
-		enc = base64.NewEncoder(base64.StdEncoding, sb)
-		_, err = enc.Write(n.OctetString)
-		if err != nil {
-			return
-		}
-		err = enc.Close()
-		if err != nil {
-			return
-		}
-		sb.WriteRune('|')
 		return
 	}
 

@@ -181,62 +181,6 @@ func TestParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "xpass: base64 with whitespace",
-			args: args{
-				s: strings.NewReader("|YWJ j|"),
-			},
-			wantN: &Node{
-				Kind:        KindBase64,
-				OctetString: []byte("abc"),
-				List:        nil,
-			},
-			wantErr: false,
-		},
-		{
-			name: "xfail: base64 with newline",
-			args: args{
-				s: strings.NewReader("#61\n62 63 #"),
-			},
-			wantN:   nil,
-			wantErr: true,
-		},
-		{
-			name: "xfail: base64 without termination",
-			args: args{
-				s: strings.NewReader("|YWj#61"),
-			},
-			wantN:   nil,
-			wantErr: true,
-		},
-		{
-			name: "xfail: base64 but eof",
-			args: args{
-				s: strings.NewReader("|YWj"),
-			},
-			wantN:   nil,
-			wantErr: true,
-		},
-		{
-			name: "xpass: base64 with length prefix",
-			args: args{
-				s: strings.NewReader("3|YWJj|"),
-			},
-			wantN: &Node{
-				Kind:        KindBase64,
-				OctetString: []byte("abc"),
-				List:        nil,
-			},
-			wantErr: false,
-		},
-		{
-			name: "xfail: base64 with wrong length prefix",
-			args: args{
-				s: strings.NewReader("4|YWJj|"),
-			},
-			wantN:   nil,
-			wantErr: true,
-		},
-		{
 			name: "xpass: list of two tokens with embedded lists",
 			args: args{
 				s: strings.NewReader("(abc (def ghi z/a))"),
@@ -381,14 +325,6 @@ func TestNode_String(t *testing.T) {
 			),
 			want: "(abc #616263#)",
 		},
-		{
-			name: "(abc |YWJj|)",
-			fields: MustList(
-				MustToken("abc"),
-				MustBase64([]byte("abc")),
-			),
-			want: "(abc |YWJj|)",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -444,7 +380,7 @@ func TestParseMulti(t *testing.T) {
 		{
 			name: "xpass: consecutive list and token",
 			args: args{
-				s: strings.NewReader("(a b)c d|YWJj|"),
+				s: strings.NewReader("(a b)c d#6162#"),
 			},
 			wantN: []*Node{
 				MustList(
@@ -453,7 +389,7 @@ func TestParseMulti(t *testing.T) {
 				),
 				MustToken("c"),
 				MustToken("d"),
-				MustBase64([]byte("abc")),
+				MustHexadecimal([]byte("ab")),
 			},
 			wantErr: false,
 		},
