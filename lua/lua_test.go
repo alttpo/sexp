@@ -216,6 +216,58 @@ func TestLuaEncoder(t *testing.T) {
 			wantErr: "",
 			wantN:   "(a b c)",
 		},
+		{
+			name: "(a+1 b-2 c/3)",
+			arg: expectList(
+				expectToken("a+1"),
+				expectToken("b-2"),
+				expectToken("c/3"),
+			),
+			wantErr: "",
+			wantN:   "(a+1 b-2 c/3)",
+		},
+		{
+			name: "((a test) (key-value value) (new-key value-new))",
+			arg: expectList(
+				expectList(
+					expectToken("a"),
+					expectToken("test"),
+				),
+				expectList(
+					expectToken("key-value"),
+					expectToken("value"),
+				),
+				expectList(
+					expectToken("new-key"),
+					expectToken("value-new"),
+				),
+			),
+			wantErr: "",
+			wantN:   "((a test) (key-value value) (new-key value-new))",
+		},
+		{
+			name: "((read snes/console/wram (address #0010#) (size #01#)) (result #14#))",
+			arg: expectList(
+				expectList(
+					expectToken("read"),
+					expectToken("snes/console/wram"),
+					expectList(
+						expectToken("address"),
+						expectToken("#0010#"),
+					),
+					expectList(
+						expectToken("size"),
+						expectToken("#01#"),
+					),
+				),
+				expectList(
+					expectToken("result"),
+					expectToken("#14#"),
+				),
+			),
+			wantErr: "",
+			wantN:   "((read snes/console/wram (address #0010#) (size #01#)) (result #14#))",
+		},
 	}
 
 	l := lua.NewState(lua.Options{})
