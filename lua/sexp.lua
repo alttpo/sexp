@@ -97,7 +97,7 @@ do
                 i = i + 1
             else
                 -- hit something else:
-                return node(), i, null
+                return node(), i, nil
             end
         end
 
@@ -109,9 +109,9 @@ do
     -- s: string:  s-expression to parse
     -- i: integer: starting index
     -- returns:
-    --   n:  table:   node or null
+    --   n:  table:   node or nil
     --   i:  integer: ending index
-    --   err: table:  error or null
+    --   err: table:  error or nil
     local function parse_list(s, i)
         local function serr(str)
             return { err = str; i = i }
@@ -135,7 +135,7 @@ do
                 return n, i, err
             end
             if eol then
-                return n, i, null
+                return n, i, nil
             end
 
             n.list[#n.list+1] = child
@@ -199,8 +199,8 @@ do
                 -- skip whitespace
             elseif r == _ch_hash then
                 -- end of hex:
-                return node(), i, null
-            elseif h ~= null then
+                return node(), i, nil
+            elseif h ~= nil then
                 -- add hex char:
                 e = e + 1
                 if e == 2 then
@@ -221,10 +221,10 @@ do
     -- s: string:  s-expression to parse
     -- i: integer: starting index
     -- returns:
-    --   n:  table:   node or null
+    --   n:  table:   node or nil
     --   i:  integer: ending index
     --   eol: bool:   end of list
-    --   err: table:  error or null
+    --   err: table:  error or nil
     parse_node = function(s, i)
         local function serr(str)
             return { err = str; i = i }
@@ -248,7 +248,7 @@ do
                 -- skip whitespace
             elseif r == _ch_paren_close then
                 -- end of list
-                return null, i, true, null
+                return nil, i, true, nil
             elseif r == _ch_paren_open then
                 -- start of list
                 n, i, err = parse_list(s, i)
@@ -260,19 +260,64 @@ do
                 n, i, err = parse_token(s, i - 1)
                 return n, i, false, err
             else
-                return null, i, false, serr('unexpected character')
+                return nil, i, false, serr('unexpected character')
             end
         end
 
-        return null, i, false, serr('eof')
+        return nil, i, false, serr('eof')
     end
 
-    -- global entry point for parsing
-    function sexp_parse(s)
+    -------------
+    -- decoder --
+    -------------
+    function sexp_decode(s)
+        if type(s) ~= 'string' then
+            return nil, 0, { err = 'expected string argument', i = 0 }
+        end
+
         local n, i, eol, err = parse_node(s, 1)
         if eol then
             return n, i, { err = 'unexpected end of list', i = i }
         end
         return n, i, err
+    end
+
+    local function sexp_encode_node(n, sb)
+        local err
+        if type(n.list) == 'table' then
+            sb[#sb+1] = '('
+            for i, c in ipairs(n.list) do
+                err = sexp_encode_node(c, sb)
+                if err then
+                    return err
+                end
+                if i < #n.list then
+                    sb[#sb+1] = ' '
+                end
+            end
+            sb[#sb+1] = ')'
+            return nil
+        elseif type(n.hex) == 'string' then
+            sb[#sb+1] = '#'
+            for i=1,#n.hex do
+                sb[#sb+1] = string.format("%02x", n.hex:byte(i))
+            end
+            sb[#sb+1] = '#'
+            return nil
+        elseif type(n.token) == 'string' then
+            sb[#sb+1] = n.token
+            return nil
+        else
+            return { err = 'unknown node type' }
+        end
+    end
+
+    -------------
+    -- encoder --
+    -------------
+    function sexp_encode(n)
+        local sb = {}
+        local err = sexp_encode_node(n, sb)
+        return table.concat(sb), err
     end
 end

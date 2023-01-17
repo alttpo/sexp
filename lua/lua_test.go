@@ -37,7 +37,33 @@ func expectList(children ...*lua.LTable) *lua.LTable {
 	return t
 }
 
-func TestLuaParser(t *testing.T) {
+func fmtLua(v lua.LValue) string {
+	if v == nil {
+		return ""
+	}
+
+	switch v.Type() {
+	case lua.LTTable:
+		tb := v.(*lua.LTable)
+		sb := &strings.Builder{}
+		sb.WriteRune('{')
+		tb.ForEach(func(key lua.LValue, val lua.LValue) {
+			sb.WriteString(fmtLua(key))
+			sb.WriteRune('=')
+			sb.WriteString(fmtLua(val))
+			sb.WriteRune(',')
+		})
+		s := sb.String()
+		return s[0:len(s)-1] + "}"
+	case lua.LTString:
+		st := string(v.(lua.LString))
+		return fmt.Sprintf("%q", st)
+	default:
+		return v.String()
+	}
+}
+
+func TestLuaDecoder(t *testing.T) {
 	type test struct {
 		name    string
 		n       *sexp.Node
@@ -135,7 +161,7 @@ func TestLuaParser(t *testing.T) {
 
 			err = l.CallByParam(
 				lua.P{
-					Fn:      l.GetGlobal("sexp_parse"),
+					Fn:      l.GetGlobal("sexp_decode"),
 					NRet:    3,
 					Protect: true,
 				},
@@ -157,7 +183,7 @@ func TestLuaParser(t *testing.T) {
 				t.Fatalf("want err='%v' got '%v'", tt.wantErr, errStr)
 			}
 
-			_, _ = i, perr
+			_ = i
 
 			if !reflect.DeepEqual(tt.wantN, n) {
 				t.Fatalf("want %s\ngot  %s", fmtLua(tt.wantN), fmtLua(n))
@@ -166,28 +192,76 @@ func TestLuaParser(t *testing.T) {
 	}
 }
 
-func fmtLua(v lua.LValue) string {
-	if v == nil {
-		return ""
+func TestLuaEncoder(t *testing.T) {
+	type test struct {
+		name    string
+		arg     lua.LValue
+		wantErr string
+		wantN   string
+	}
+	var cases = []test{
+		{
+			name:    "(a)",
+			arg:     expectList(expectToken("a")),
+			wantErr: "",
+			wantN:   "(a)",
+		},
+		{
+			name: "(a b c)",
+			arg: expectList(
+				expectToken("a"),
+				expectToken("b"),
+				expectToken("c"),
+			),
+			wantErr: "",
+			wantN:   "(a b c)",
+		},
 	}
 
-	switch v.Type() {
-	case lua.LTTable:
-		tb := v.(*lua.LTable)
-		sb := &strings.Builder{}
-		sb.WriteRune('{')
-		tb.ForEach(func(key lua.LValue, val lua.LValue) {
-			sb.WriteString(fmtLua(key))
-			sb.WriteRune('=')
-			sb.WriteString(fmtLua(val))
-			sb.WriteRune(',')
+	l := lua.NewState(lua.Options{})
+	defer l.Close()
+
+	// load the tests.lua file:
+	var err error
+	err = l.DoFile("sexp.lua")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			err = l.CallByParam(
+				lua.P{
+					Fn:      l.GetGlobal("sexp_encode"),
+					NRet:    2,
+					Protect: true,
+				},
+				tt.arg,
+			)
+			if err != nil {
+				t.Fatalf("glua error: %v", err)
+			}
+
+			n, perr := l.Get(-2), l.Get(-1)
+			l.Pop(2)
+
+			errStr := ""
+			if perr != lua.LNil {
+				errStr = string(perr.(*lua.LTable).RawGetString("err").(lua.LString))
+			}
+
+			if (errStr != "") != (tt.wantErr != "") {
+				t.Fatalf("want err='%v' got '%v'", tt.wantErr, errStr)
+			}
+
+			nstr := ""
+			if nlstr, ok := n.(lua.LString); ok {
+				nstr = string(nlstr)
+			}
+
+			if tt.wantN != nstr {
+				t.Fatalf("want `%s`\ngot  `%s`", tt.wantN, nstr)
+			}
 		})
-		s := sb.String()
-		return s[0:len(s)-1] + "}"
-	case lua.LTString:
-		st := string(v.(lua.LString))
-		return fmt.Sprintf("%q", st)
-	default:
-		return v.String()
 	}
 }
