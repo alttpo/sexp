@@ -14,8 +14,8 @@
 //
 // s-expression examples:
 //
-//	(test-exp abc d.e.f/gh snake_case nil true false #616263# ^3#616263#)
-//	(^$a#00 01 02 03 04 05 06 07 08 09 0a# 1023 $3ff)
+//	(test_exp abc d.e.f/gh snake_case nil true false #616263# ^3#616263#)
+//	(^$a#0102030405060708090a# 1023 $3ff)
 //	("abc\ndef\t\"123\"\x00\xff" () ^5"12345")
 //	((a 1) (b 2) (c 3) (d nil) (e false))
 //
@@ -68,9 +68,9 @@
 //
 //	examples:
 //	  `test_exp`
-//	  `abc`
+//	  `abc!`
 //	  `d.e.f/gh`
-//	  `snake_case`
+//	  `snake_case?`
 //	  `@true`
 //	  `@nil`
 //
